@@ -5,7 +5,7 @@ export default function AuthForm({ onLogin }) {
   const [password, setPassword] = useState("");
 
   const register = async () => {
-    const response = await fetch("http://localhost:5000/register", {
+    const response = await fetch("http://localhost:6969/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
@@ -15,7 +15,7 @@ export default function AuthForm({ onLogin }) {
   };
 
   const login = async () => {
-    const response = await fetch("http://localhost:5000/login", {
+    const response = await fetch("http://localhost:6969/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),

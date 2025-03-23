@@ -5,7 +5,7 @@ export default function FriendRequests({ username, socket }) {
 
   useEffect(() => {
     const fetchRequests = async () => {
-      const response = await fetch(`http://localhost:5000/friend_requests/${username}`);
+      const response = await fetch(`http://localhost:6969/friend_requests/${username}`);
       const data = await response.json();
       setRequests(data);
     };
@@ -29,7 +29,7 @@ export default function FriendRequests({ username, socket }) {
   }, [socket, username]);
 
   const respondToRequest = async (sender, action) => {
-    await fetch("http://localhost:5000/respond_friend_request", {
+    await fetch("http://localhost:6969/respond_friend_request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sender, receiver: username, action }),

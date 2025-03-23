@@ -7,7 +7,7 @@ export default function ChatWindow({ username, receiver, socket }) {
   useEffect(() => {
     if (!receiver) return;
 
-    fetch(`http://localhost:5000/messages/${username}/${receiver}`)
+    fetch(`http://localhost:6969/messages/${username}/${receiver}`)
       .then((res) => res.json())
       .then((data) => setChatMessages(data))
       .catch((err) => console.error("Failed to fetch messages:", err));

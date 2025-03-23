@@ -4,7 +4,7 @@ import AuthForm from "./components/AuthForm";
 import FriendList from "./components/FriendList";
 import ChatWindow from "./components/ChatWindow";
 
-const socket = io("http://localhost:5000");
+const socket = io("http://localhost:6969");
 
 export default function App() {
   const [username, setUsername] = useState("");
@@ -25,7 +25,7 @@ export default function App() {
   }, [loggedIn]);
 
   const fetchUsers = async () => {
-    const response = await fetch("http://localhost:5000/users");
+    const response = await fetch("http://localhost:6969/users");
     const data = await response.json();
     setUsers(data);
   };

@@ -4,7 +4,7 @@ from flask_socketio import SocketIO, emit, join_room
 import sqlite3
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
+CORS(app, origins=["http://localhost:5174"], supports_credentials=True)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 def init_db():
@@ -153,4 +153,4 @@ def handle_message(data):
 
 if __name__ == "__main__":
     init_db()
-    socketio.run(app, debug=True)
+    socketio.run(app, host="0.0.0.0", port=6969)
