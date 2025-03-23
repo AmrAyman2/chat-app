@@ -14,34 +14,35 @@ export default function App() {
   const [messages, setMessages] = useState([]);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("token");
+    const token = localStorage.getItem("token");
     const storedUsername = localStorage.getItem("username");
 
-    if (storedToken && storedUsername) {
-      verifyToken(storedToken, storedUsername);
+    if (token && storedUsername) {
+      setUsername(storedUsername);
+      setLoggedIn(true);
+      socket.emit("join", { username: storedUsername });
+      fetchUsers();
     }
   }, []);
 
-  const verifyToken = async (token, user) => {
-    try {
-      const response = await fetch("http://localhost:6969/protected", {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
+  useEffect(() => {
+    if (loggedIn) {
+      socket.on("new_message", (msg) => {
+        setMessages((prev) => [...prev, msg]);
       });
 
-      if (response.ok) {
-        setUsername(user);
-        setLoggedIn(true);
-        socket.emit("join", { username: user });
+      socket.on("user_registered", () => {
         fetchUsers();
-      } else {
-        localStorage.removeItem("token");
-        localStorage.removeItem("username");
-      }
-    } catch (error) {
-      console.error("Token verification failed:", error);
+      });
+
+      fetchUsers();
     }
-  };
+
+    return () => {
+      socket.off("new_message");
+      socket.off("user_registered");
+    };
+  }, [loggedIn]);
 
   const fetchUsers = async () => {
     try {
@@ -49,13 +50,13 @@ export default function App() {
       const data = await response.json();
       setUsers(data);
     } catch (error) {
-      console.error("Failed to fetch users:", error);
+      console.error("Error fetching users:", error);
     }
   };
 
   const handleLogin = (user, token) => {
-    localStorage.setItem("username", user);
     localStorage.setItem("token", token);
+    localStorage.setItem("username", user);
     setUsername(user);
     setLoggedIn(true);
     socket.emit("join", { username: user });
@@ -74,17 +75,17 @@ export default function App() {
       {!loggedIn ? (
         <AuthForm onLogin={handleLogin} />
       ) : (
-        <div className="flex w-full h-screen p-4 space-x-4">
-          <div className="absolute top-4 right-4">
-            <button
-              className="bg-red-500 text-white p-2 rounded-lg"
-              onClick={handleLogout}
-            >
-              Logout
-            </button>
+        <div className="flex flex-col w-full h-screen p-4 space-y-4">
+          <button 
+            className="bg-red-500 text-white px-4 py-2 rounded-lg self-end"
+            onClick={handleLogout}
+          >
+            Logout
+          </button>
+          <div className="flex w-full h-full space-x-4">
+            <FriendList users={users} onSelectFriend={setReceiver} username={username} socket={socket} />
+            <ChatWindow username={username} receiver={receiver} messages={messages} socket={socket} />
           </div>
-          <FriendList users={users} onSelectFriend={setReceiver} username={username} />
-          <ChatWindow username={username} receiver={receiver} messages={messages} socket={socket} />
         </div>
       )}
     </div>

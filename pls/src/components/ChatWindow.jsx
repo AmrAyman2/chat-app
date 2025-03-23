@@ -4,6 +4,7 @@ export default function ChatWindow({ username, receiver, socket }) {
   const [message, setMessage] = useState("");
   const [chatMessages, setChatMessages] = useState([]);
 
+  // Fetch messages when receiver changes
   useEffect(() => {
     if (!receiver) return;
 
@@ -11,20 +12,24 @@ export default function ChatWindow({ username, receiver, socket }) {
       .then((res) => res.json())
       .then((data) => setChatMessages(data))
       .catch((err) => console.error("Failed to fetch messages:", err));
-  }, [receiver]);
+  }, [receiver, username]);
 
+  // Listen for incoming messages
   useEffect(() => {
-    socket.on("new_message", (msg) => {
-      if (
-        (msg.sender === username && msg.receiver === receiver) ||
-        (msg.sender === receiver && msg.receiver === username)
-      ) {
-        setChatMessages((prev) => [...prev, msg]);
-      }
-    });
+    const handleNewMessage = (msg) => {
+      // Prevent duplicate messages
+      setChatMessages((prev) => {
+        if (prev.some((m) => m.sender === msg.sender && m.content === msg.content)) {
+          return prev; // Don't add duplicates
+        }
+        return [...prev, msg];
+      });
+    };
+
+    socket.on("new_message", handleNewMessage);
 
     return () => {
-      socket.off("new_message");
+      socket.off("new_message", handleNewMessage);
     };
   }, [socket, username, receiver]);
 
@@ -32,9 +37,6 @@ export default function ChatWindow({ username, receiver, socket }) {
     if (!message.trim() || !receiver) return;
 
     const newMessage = { sender: username, receiver, content: message };
-
-    // Optimistically add message to UI
-    setChatMessages((prev) => [...prev, newMessage]);
 
     // Send message to server
     socket.emit("send_message", newMessage);
@@ -47,7 +49,10 @@ export default function ChatWindow({ username, receiver, socket }) {
     <div className="flex flex-col flex-grow bg-gray-800 p-4 rounded-lg">
       <div className="flex-grow overflow-y-auto h-96 p-2 bg-gray-700 rounded-lg">
         {chatMessages.map((msg, index) => (
-          <div key={index} className="mb-2 p-2 rounded-lg" style={{ backgroundColor: msg.sender === username ? "blue" : "gray" }}>
+          <div
+            key={index}
+            className={`mb-2 p-2 rounded-lg ${msg.sender === username ? "bg-blue-500" : "bg-gray-600"}`}
+          >
             <strong>{msg.sender === username ? "You" : msg.sender}:</strong> {msg.content}
           </div>
         ))}
@@ -59,7 +64,10 @@ export default function ChatWindow({ username, receiver, socket }) {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
-        <button className="p-2 bg-blue-500 text-white rounded-r-lg hover:bg-blue-600" onClick={sendMessage}>
+        <button
+          className="p-2 bg-blue-500 text-white rounded-r-lg hover:bg-blue-600"
+          onClick={sendMessage}
+        >
           Send
         </button>
       </div>
