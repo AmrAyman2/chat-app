@@ -2,6 +2,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room
 import sqlite3
+import jwt
+import datetime
+from functools import wraps
+
+# SECRET KEY for JWT (Generate your own secret key)
+SECRET_KEY = "a1b2c3d4e5f6g7h8i9j0"
 
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:5174"], supports_credentials=True)
@@ -32,6 +38,24 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+# Middleware to protect routes
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get("Authorization")
+        if not token:
+            return jsonify({"message": "Token is missing!"}), 401
+        
+        try:
+            token = token.split(" ")[1]  # Remove 'Bearer'
+            decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            request.user = decoded
+        except:
+            return jsonify({"message": "Invalid token!"}), 401
+
+        return f(*args, **kwargs)
+    return decorated
 
 @app.route("/register", methods=["POST"])
 def register():
@@ -68,88 +92,32 @@ def login():
     conn.close()
 
     if user:
-        return jsonify({"message": "Login successful"}), 200
+        token = jwt.encode({"username": username, "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1)}, SECRET_KEY, algorithm="HS256")
+        return jsonify({"token": token, "user": {"username": username}}), 200
     return jsonify({"message": "Invalid credentials"}), 401
 
-@app.route("/users/<username>", methods=["GET"])
-def get_users(username):
+@app.route("/verify-token", methods=["POST"])
+def verify_token():
+    token = request.headers.get("Authorization")
+    if not token:
+        return jsonify({"valid": False}), 401
+    
+    try:
+        token = token.split(" ")[1]  # Remove 'Bearer'
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        return jsonify({"valid": True, "user": {"username": decoded["username"]}}), 200
+    except:
+        return jsonify({"valid": False}), 401
+
+@app.route("/users", methods=["GET"])
+@token_required  # Protect this route
+def get_users():
     conn = sqlite3.connect("chat.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT username FROM users WHERE username != ?", (username,))
+    cursor.execute("SELECT username FROM users")
     users = [row[0] for row in cursor.fetchall()]
     conn.close()
     return jsonify(users), 200
-
-@app.route("/messages", methods=["POST"])
-def save_message():
-    data = request.json
-    sender, receiver, content = data.get("sender"), data.get("receiver"), data.get("content")
-
-    if not sender or not receiver or not content:
-        return jsonify({"message": "Invalid message"}), 400
-
-    conn = sqlite3.connect("chat.db")
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO messages (sender, receiver, content) VALUES (?, ?, ?)", 
-                   (sender, receiver, content))
-    conn.commit()
-    conn.close()
-
-    socketio.emit("new_message", data, room=receiver)  
-    return jsonify({"message": "Message sent"}), 201
-
-@app.route("/messages/<sender>/<receiver>", methods=["GET"])
-def get_messages(sender, receiver):
-    conn = sqlite3.connect("chat.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT sender, receiver, content, timestamp FROM messages 
-        WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?) 
-        ORDER BY timestamp
-    """, (sender, receiver, receiver, sender))
-    messages = [{"sender": row[0], "receiver": row[1], "content": row[2], "timestamp": row[3]} for row in cursor.fetchall()]
-    conn.close()
-    return jsonify(messages), 200
-
-@socketio.on("join")
-def on_join(data):
-    username = data["username"]
-    join_room(username)
-
-@socketio.on("send_message")
-def handle_send_message(data):
-    sender = data["sender"]
-    receiver = data["receiver"]
-    content = data["content"]
-
-    conn = sqlite3.connect("chat.db")
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO messages (sender, receiver, content) VALUES (?, ?, ?)",
-        (sender, receiver, content),
-    )
-    conn.commit()
-    conn.close()
-
-    emit("new_message", data, room=receiver)
-    emit("new_message", data, room=sender)
-
-
-@socketio.on("send_message")
-def handle_message(data):
-    sender, receiver, content = data.get("sender"), data.get("receiver"), data.get("content")
-
-    if not sender or not receiver or not content:
-        return
-
-    conn = sqlite3.connect("chat.db")
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO messages (sender, receiver, content) VALUES (?, ?, ?)", 
-                   (sender, receiver, content))
-    conn.commit()
-    conn.close()
-
-    emit("new_message", data, room=receiver)  
 
 if __name__ == "__main__":
     init_db()
